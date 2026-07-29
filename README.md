@@ -1,64 +1,65 @@
 # OmniWM Computer Use
 
-A Codex skill for reliably controlling macOS apps through Computer Use when [OmniWM](https://github.com/BarutSRB/OmniWM) uses Niri-style scrolling workspaces and multiple displays.
+A Codex skill for protecting the user's active macOS window and layout while agents run browser automation, launch and test apps, or use Computer Use with [OmniWM](https://github.com/BarutSRB/OmniWM).
 
-OmniWM can keep unfocused columns outside the physical display or place inactive-workspace windows at negative coordinates. Computer Use can often inspect those windows, but coordinate actions and multi-window apps need explicit window targeting. This skill coordinates both systems through `omniwmctl`.
+The skill coordinates GUI work through OmniWM's bundled `omniwmctl`. It can target exact windows across workspaces and displays, and its short-lived focus guard restores the window the user was working in when Chrome or another automated app tries to become active.
 
-## What it handles
+## What it provides
 
-- Targets an exact window by bundle ID, app name, and optional title text.
-- Refuses ambiguous multi-window matches instead of guessing.
-- Switches to the correct workspace and display.
-- Waits for focus and resize animations to settle.
-- Verifies full containment against the target display's visible frame.
-- Optionally centers or fits a Niri column with `--fit-visible`.
-- Documents current OmniWM hotkey fallbacks and Computer Use limitations.
+- Event-driven focus protection with a polling fallback and automatic TTL.
+- Capture and immediate restoration around foreground-only actions.
+- Exact window selection by bundle ID, app name, and title.
+- Multi-display and Niri scrolling-workspace coordination.
+- Stable-frame and visible-frame verification before coordinate actions.
+- An idempotent installer for skill registration, OmniWM IPC, and a global Codex rule.
+- A live verifier for the complete setup.
 
 ## Requirements
 
-- macOS with OmniWM running.
-- OmniWM IPC enabled with `general.ipcEnabled = true`.
-- The `omniwmctl` binary, normally at `/Applications/OmniWM.app/Contents/MacOS/omniwmctl`.
-- `jq`.
-- Codex with the Computer Use plugin for app interaction.
+- macOS with OmniWM 0.5.9 or a compatible later version
+- Codex
+- `jq`
+- Python 3.11 or later
 
-Tested with OmniWM 0.5.4, IPC protocol 6, on built-in and Sidecar displays.
+Use the `omniwmctl` bundled with the installed OmniWM app. The app and CLI IPC protocols must remain compatible.
 
 ## Install
 
 ```bash
 git clone https://github.com/nick-s5/omniwm-computer-use.git
-mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-cp -R omniwm-computer-use/omniwm-computer-use \
-  "${CODEX_HOME:-$HOME/.codex}/skills/omniwm-computer-use"
+cd omniwm-computer-use
+./scripts/install.sh --dry-run
+./scripts/install.sh
 ```
 
-Start a new Codex task after installation so the skill catalog refreshes.
+Start a new Codex task after installation so it loads the global rule and skill catalog.
 
-## Helper usage
+See [Complete setup](references/setup.md) for prerequisites, environment overrides, verification, troubleshooting, rollback, and behavioral limitations.
+
+## Verify
+
+Focus an OmniWM-managed app window, then run:
 
 ```bash
-omniwm-computer-use/scripts/focus-window.sh \
-  --bundle-id com.canva.affinity
-
-omniwm-computer-use/scripts/focus-window.sh \
-  --bundle-id app.zen-browser.zen \
-  --title-contains "Private Browsing"
-
-omniwm-computer-use/scripts/focus-window.sh \
-  --app Slack \
-  --fit-visible
+./scripts/verify-setup.sh
 ```
 
-The helper returns JSON containing the focused window, target display, stable frame, containment result, and any fit action applied.
-
-`--fit-visible` can change the focused column's size or position. Its output includes `originalFrame`, but restoring a semantic OmniWM preset is usually more reliable than restoring raw points after moving between differently sized displays.
+The verifier checks the installed skill, global agent rule, TOML configuration, live IPC connection, and a real capture/status/restore cycle.
 
 ## Repository layout
 
 ```text
-omniwm-computer-use/
-  SKILL.md
-  agents/openai.yaml
-  scripts/focus-window.sh
+.
+├── SKILL.md
+├── agents/
+│   └── openai.yaml
+├── references/
+│   └── setup.md
+└── scripts/
+    ├── focus-guard.sh
+    ├── focus-window.sh
+    ├── install.sh
+    └── verify-setup.sh
 ```
+
+The repository root is the skill root. This allows the clone to be linked directly into `${CODEX_HOME:-$HOME/.codex}/skills/omniwm-computer-use`.

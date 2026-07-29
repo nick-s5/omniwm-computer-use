@@ -1,0 +1,4 @@
+interface:
+  display_name: "OmniWM Computer Use"
+  short_description: "Preserve focus during Mac GUI automation"
+  default_prompt: "Use $omniwm-computer-use to preserve my current focus and layout while safely automating Mac app windows."

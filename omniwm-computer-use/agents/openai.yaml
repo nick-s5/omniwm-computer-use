@@ -1,4 +1,0 @@
-interface:
-  display_name: "OmniWM Computer Use"
-  short_description: "Control offscreen OmniWM windows reliably"
-  default_prompt: "Use $omniwm-computer-use to target, focus, and resize the correct OmniWM window before controlling the app."

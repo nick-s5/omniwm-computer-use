@@ -59,10 +59,13 @@ command -v jq >/dev/null 2>&1 || {
 
 if [[ -n "${OMNIWMCTL:-}" ]]; then
   ctl=$OMNIWMCTL
+elif [[ -x /Applications/OmniWM.app/Contents/MacOS/omniwmctl ]]; then
+  ctl=/Applications/OmniWM.app/Contents/MacOS/omniwmctl
 elif command -v omniwmctl >/dev/null 2>&1; then
   ctl=$(command -v omniwmctl)
 else
-  ctl=/Applications/OmniWM.app/Contents/MacOS/omniwmctl
+  printf '%s\n' 'omniwmctl not found.' >&2
+  exit 69
 fi
 
 [[ -x "$ctl" ]] || {
@@ -194,7 +197,7 @@ if [[ "$fit_visible" == true && "$fully_contained" != true ]]; then
   layout=$(jq -r '.result.payload.workspaces[0].layout' <<<"$workspace_state")
 
   if [[ "$layout" != niri ]]; then
-    emit_fit_error "Cannot fit a partially visible $layout workspace with Niri column commands."
+    emit_fit_error "Cannot fit a partially visible $layout workspace with Niri container commands."
     exit 1
   fi
 
@@ -202,16 +205,31 @@ if [[ "$fit_visible" == true && "$fully_contained" != true ]]; then
     "$ctl" command center-column >/dev/null
     fit_action='center-column'
   else
-    height_fits=$(jq -nr \
-      --argjson window "$window" \
-      --argjson display "$display" \
-      '$window.frame.height <= ($display.visibleFrame.height + 0.5)')
-    if [[ "$height_fits" != true ]]; then
-      emit_fit_error 'The window is taller than the display; automatic height fitting is not enabled.'
+    orientation=$(jq -r '.orientation // empty' <<<"$display")
+    case "$orientation" in
+      horizontal)
+        secondary_fits=$(jq -nr \
+          --argjson window "$window" \
+          --argjson display "$display" \
+          '$window.frame.height <= ($display.visibleFrame.height + 0.5)')
+        ;;
+      vertical)
+        secondary_fits=$(jq -nr \
+          --argjson window "$window" \
+          --argjson display "$display" \
+          '$window.frame.width <= ($display.visibleFrame.width + 0.5)')
+        ;;
+      *)
+        emit_fit_error "Cannot fit the window because OmniWM reported an unknown display orientation: $orientation"
+        exit 1
+        ;;
+    esac
+    if [[ "$secondary_fits" != true ]]; then
+      emit_fit_error 'The window exceeds the display secondary axis; automatic secondary-span fitting is not enabled.'
       exit 1
     fi
-    "$ctl" command expand-column-to-available-width >/dev/null
-    fit_action='expand-column-to-available-width'
+    "$ctl" command expand-container-to-available-primary-span >/dev/null
+    fit_action='expand-container-to-available-primary-span'
   fi
   fit_applied=true
 
