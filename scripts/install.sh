@@ -177,7 +177,7 @@ block = f"""\
 {begin}
 ## macOS window-focus safety
 
-Before any action that may open, activate, focus, move, resize, hide, or close a Mac app window—including Playwright, Chrome or browser-plugin automation, `open`, app testing, and Computer Use—read and follow `{skill_md}`. Treat the user's currently focused OmniWM window and layout as protected. Use its short-lived focus guard for background-capable actions; for foreground-only interactions, capture immediately before one bounded action and restore immediately afterward. Never leave an automation app active unless the user explicitly requests it.
+Before any action that may open, activate, focus, move, resize, hide, or close a Mac app window—including Playwright, Chrome or browser-plugin automation, `open`, app testing, and Computer Use—read and follow `{skill_md}`. Treat the user's currently focused OmniWM window and layout as protected. For background-capable actions, use a one-shot guard with the expected bundle ID or app name when known; yield and disarm on unrelated user focus changes, and never refocus during guard cleanup. For foreground-only interactions, capture immediately before one bounded action and restore immediately afterward. Never leave an automation app active unless the user explicitly requests it.
 {end}
 """
 

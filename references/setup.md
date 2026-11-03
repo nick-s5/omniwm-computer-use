@@ -5,12 +5,14 @@ This setup makes the OmniWM focus-protection workflow available to every Codex t
 ## Prerequisites
 
 - macOS with OmniWM installed in `/Applications/OmniWM.app`
-- OmniWM 0.5.9 or a later version that supports the documented CLI commands
+- OmniWM 0.6.1 / IPC protocol 10 or OmniWM 0.7.6 / IPC protocol 19 with the documented CLI commands
 - Codex
 - `jq`
 - Python 3.11 or later
 
 Keep the app and its bundled `omniwmctl` together. The IPC protocol is version-coupled; do not substitute an older standalone CLI.
+
+OmniWM 0.6.1 changed Dwindle CLI resizing from directions to axes. Update the app and CLI together, rebuild third-party IPC clients, replace `resize left|right` with `resize horizontal`, and replace `resize up|down` with `resize vertical`. Custom directional Dwindle resize hotkeys are dropped during the upgrade and must be reassigned in **Settings → Hotkeys → Show Advanced**.
 
 ## Install
 
@@ -45,7 +47,7 @@ Start a new Codex task after installation. Tasks that were already running may h
 
 ## Verify
 
-Focus an OmniWM-managed window, then run:
+With an OmniWM-managed window focused, run the read-only verifier:
 
 ```bash
 ./scripts/verify-setup.sh
@@ -55,14 +57,17 @@ The verifier checks:
 
 - the installed skill link and global rule;
 - valid TOML with IPC enabled;
-- the bundled CLI, live IPC ping, and protocol version;
+- the bundled CLI, live IPC ping, supported protocols 10 and 19, and the capabilities response schema;
 - `jq` and Python/TOML support;
-- a real `capture`, `status`, and `restore` cycle without moving or resizing a window.
+- the focused-window and window-inventory schemas without changing focus.
+
+Only with foreground authorization, `./scripts/verify-setup.sh --check-restore` also runs a real `capture`, `status`, and `restore` cycle. Restoration may refocus the captured window; use it when that focus action is allowed.
 
 For an explicit guard test, use a short TTL:
 
 ```bash
-guard_json=$(./scripts/focus-guard.sh guard --ttl 5)
+guard_json=$(./scripts/focus-guard.sh guard --ttl 5 \
+  --expect-bundle-id com.google.Chrome)
 guard_token=$(jq -r '.token' <<<"$guard_json")
 ./scripts/focus-guard.sh status "$guard_token"
 ./scripts/focus-guard.sh restore "$guard_token"
@@ -71,13 +76,13 @@ guard_token=$(jq -r '.token' <<<"$guard_json")
 ## How agents should use it
 
 - Prefer headless, in-app, or non-activating automation.
-- Guard one background-capable tool call, then restore immediately.
+- Guard one background-capable tool call with the expected bundle ID or app name when known, then clean up immediately.
 - Capture immediately before one foreground-only action, then restore immediately.
 - Re-capture before later actions so the user's current choice is respected.
 - Diff window IDs before and after launches. Contain only fresh agent-created windows.
 - Never move, resize, scratchpad, close, or reassign a pre-existing user window for automation convenience.
 
-The guard responds to OmniWM focus events and retains polling as a fallback. Its TTL prevents an abandoned guard from indefinitely fighting user input.
+The guard responds to OmniWM focus events and retains polling as a fallback. It restores an expected automation app once and immediately disarms. An unrelated pre-existing window is treated as user intent, so the guard yields without changing focus. Cleanup does not refocus after a background guard.
 
 ## Troubleshooting
 
@@ -87,6 +92,8 @@ If `omniwmctl ping` reports connection refused:
 2. Confirm `[general]` contains `ipcEnabled = true`.
 3. Confirm the bundled CLI is executable.
 4. Restart OmniWM if live reload did not enable IPC.
+
+If verification reports an incompatible protocol, upgrade OmniWM and its bundled `omniwmctl` together. Do not copy an older CLI into place or bypass the protocol handshake.
 
 If capture reports no focused managed window, focus a normal OmniWM-managed app window and retry. OmniWM does not return unmanaged windows through `query focused-window`.
 
@@ -119,3 +126,5 @@ Restore a timestamped backup if the previous OmniWM or global agent configuratio
 ## Limitation
 
 Focus restoration cannot guarantee that a newly created macOS window is never rendered for a frame. Headless or explicitly non-activating automation gives the strongest protection. Use a separately identifiable automation app/profile or a dedicated OmniWM workspace when new windows must remain open; do not apply broad rules to a user's existing Chrome windows.
+
+A virtual display can keep automation windows off a shared physical monitor, but it does not isolate the system-wide active macOS application and therefore does not solve focus stealing by itself. Use a separate macOS login session or virtual machine only when hard GUI isolation is required.
